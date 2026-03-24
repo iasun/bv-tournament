@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор волейбольных пар</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; background: #f4f4f9; }
+        input { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        #result { margin-top: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .game { padding: 8px 0; border-bottom: 1px solid #eee; }
+        .game:last-child { border-bottom: none; }
+    </style>
+</head>
+<body>
+
+    <h2>🏐 Сетка «Каждый с каждым»</h2>
+    <p>Введите количество игроков (N):</p>
+    <input type="number" id="playerCount" placeholder="Например, 8" min="4">
+    <button onclick="generate()">Рассчитать матчи</button>
+
+    <div id="result" style="display:none;"></div>
+
+<script>
+function generate() {
+    const n = parseInt(document.getElementById('playerCount').value);
+    if (isNaN(n) || n < 4) {
+        alert("Нужно минимум 4 игрока");
+        return;
+    }
+
+    // Создаем матрицу пар (true - свободна)
+    let pairs = Array.from({ length: n }, () => Array(n).fill(false));
+    for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) pairs[i][j] = true;
+    }
+
+    let schedule = [];
+
+    function solve() {
+        let p1 = -1, p2 = -1;
+        // Ищем первую свободную пару
+        for (let i = 0; i < n; i++) {
+            for (let j = i + 1; j < n; j++) {
+                if (pairs[i][j]) { p1 = i; p2 = j; break; }
+            }
+            if (p1 !== -1) break;
+        }
+
+        if (p1 === -1) return true; // Все пары распределены
+
+        pairs[p1][p2] = false;
+
+        // Ищем оппонентов
+        let options = [];
+        for (let i = 0; i < n; i++) {
+            for (let j = i + 1; j < n; j++) {
+                if (pairs[i][j] && i !== p1 && i !== p2 && j !== p1 && j !== p2) {
+                    options.push([i, j]);
+                }
+            }
+        }
+
+        // Перемешиваем варианты (рандом как в алгоритме)
+        options.sort(() => Math.random() - 0.5);
+
+        for (let [op1, op2] of options) {
+            pairs[op1][op2] = false;
+            schedule.push(`${p1+1}-${p2+1} vs ${op1+1}-${op2+1}`);
+            
+            if (solve()) return true;
+
+            // Backtracking (откат)
+            schedule.pop();
+            pairs[op1][op2] = true;
+        }
+
+        pairs[p1][p2] = true;
+        return false;
+    }
+
+    const resDiv = document.getElementById('result');
+    resDiv.innerHTML = "Генерация...";
+    resDiv.style.display = "block";
+
+    // Даем браузеру время отрисовать "Генерация", запуская расчет через таймаут
+    setTimeout(() => {
+        if (solve()) {
+            resDiv.innerHTML = `<h3>Матчи (${schedule.length}):</h3>` + 
+                schedule.map((g, i) => `<div class="game"><b>${i+1}.</b> ${g}</div>`).join('');
+        } else {
+            resDiv.innerHTML = "Ошибка: не удалось составить полную сетку без остатков.";
+        }
+    }, 50);
+}
+</script>
+</body>
+</html>

@@ -3,97 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Генератор волейбольных пар</title>
+    <title>Волейбол: Генератор матчей</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; background: #f4f4f9; }
-        input { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
-        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #0056b3; }
-        #result { margin-top: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .game { padding: 8px 0; border-bottom: 1px solid #eee; }
+        body { font-family: -apple-system, sans-serif; padding: 20px; max-width: 500px; margin: auto; background: #f4f4f9; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 12px; margin: 10px 0 20px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        .btn-group { display: flex; gap: 8px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        .btn-main { background: #007bff; color: white; }
+        .btn-main:hover { background: #0056b3; }
+        .btn-shuffle { background: #28a745; color: white; }
+        .btn-shuffle:hover { background: #218838; }
+        button:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
+        #result { margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; }
+        .game { padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; font-size: 15px; }
         .game:last-child { border-bottom: none; }
+        .game b { color: #007bff; margin-right: 8px; }
+        .rnd { color: #d93025; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h2>🏐 Сетка «Каждый с каждым»</h2>
-    <p>Введите количество игроков (N):</p>
-    <input type="number" id="playerCount" placeholder="Например, 8" min="4">
-    <button onclick="generate()">Рассчитать матчи</button>
+<div class="card">
+    <h2 style="margin-top:0;">🏐 Сетка игр каждый с каждым</h2>
+    <label for="playerCount">Количество игроков (N):</label>
+    <input type="number" id="playerCount" value="6" min="4">
+    
+    <div class="btn-group">
+        <button class="btn-main" onclick="fullResetAndGenerate()">Рассчитать</button>
+        <button id="shuffleBtn" class="btn-shuffle" onclick="shuffleExisting()" disabled>Перетасовать</button>
+    </div>
 
     <div id="result" style="display:none;"></div>
+</div>
 
 <script>
-function generate() {
-    const n = parseInt(document.getElementById('playerCount').value);
-    if (isNaN(n) || n < 4) {
-        alert("Нужно минимум 4 игрока");
-        return;
-    }
+let globalSchedule = [];
 
-    // Создаем матрицу пар (true - свободна)
-    let pairs = Array.from({ length: n }, () => Array(n).fill(false));
-    for (let i = 0; i < n; i++) {
-        for (let j = i + 1; j < n; j++) pairs[i][j] = true;
+function fullResetAndGenerate() {
+    const n = parseInt(document.getElementById('playerCount').value);
+    if (isNaN(n) || n < 4) { alert("Минимум 4 игрока"); return; }
+
+    const resDiv = document.getElementById('result');
+    resDiv.style.display = "block";
+    resDiv.innerHTML = "<i>Генерация...</i>";
+
+    setTimeout(() => {
+        let result = null;
+        let attempts = 0;
+
+        while (result === null && attempts < 2000) {
+            attempts++;
+            result = tryGenerate(n);
+        }
+
+        if (result) {
+            globalSchedule = result;
+            document.getElementById('shuffleBtn').disabled = false; // Активируем кнопку
+            displaySchedule();
+        } else {
+            resDiv.innerHTML = "Не удалось найти решение. Попробуйте ещё раз.";
+        }
+    }, 50);
+}
+
+function tryGenerate(n) {
+    let allPossiblePairs = [];
+    for (let i = 1; i <= n; i++) {
+        for (let j = i + 1; j <= n; j++) allPossiblePairs.push([i, j]);
     }
+    allPossiblePairs.sort(() => Math.random() - 0.5);
 
     let schedule = [];
 
-    function solve() {
-        let p1 = -1, p2 = -1;
-        // Ищем первую свободную пару
-        for (let i = 0; i < n; i++) {
-            for (let j = i + 1; j < n; j++) {
-                if (pairs[i][j]) { p1 = i; p2 = j; break; }
-            }
-            if (p1 !== -1) break;
+    function solve(currentPairs) {
+        if (currentPairs.length === 0) return true;
+        if (currentPairs.length === 1) {
+            const p = currentPairs[0];
+            schedule.push(`${p[0]}-${p[1]} vs <span class="rnd">RND</span>`);
+            return true;
         }
 
-        if (p1 === -1) return true; // Все пары распределены
+        const p1 = currentPairs[0];
+        const others = currentPairs.slice(1);
+        let candidates = others.filter(p2 => 
+            p2[0] !== p1[0] && p2[0] !== p1[1] && p2[1] !== p1[0] && p2[1] !== p1[1]
+        );
 
-        pairs[p1][p2] = false;
+        candidates.sort(() => Math.random() - 0.5);
 
-        // Ищем оппонентов
-        let options = [];
-        for (let i = 0; i < n; i++) {
-            for (let j = i + 1; j < n; j++) {
-                if (pairs[i][j] && i !== p1 && i !== p2 && j !== p1 && j !== p2) {
-                    options.push([i, j]);
-                }
-            }
-        }
-
-        // Перемешиваем варианты (рандом как в алгоритме)
-        options.sort(() => Math.random() - 0.5);
-
-        for (let [op1, op2] of options) {
-            pairs[op1][op2] = false;
-            schedule.push(`${p1+1}-${p2+1} vs ${op1+1}-${op2+1}`);
-            
-            if (solve()) return true;
-
-            // Backtracking (откат)
+        for (let op of candidates) {
+            schedule.push(`${p1[0]}-${p1[1]} vs ${op[0]}-${op[1]}`);
+            const nextPairs = others.filter(p => p !== op);
+            if (solve(nextPairs)) return true;
             schedule.pop();
-            pairs[op1][op2] = true;
         }
-
-        pairs[p1][p2] = true;
         return false;
     }
 
-    const resDiv = document.getElementById('result');
-    resDiv.innerHTML = "Генерация...";
-    resDiv.style.display = "block";
+    return solve(allPossiblePairs) ? schedule : null;
+}
 
-    // Даем браузеру время отрисовать "Генерация", запуская расчет через таймаут
-    setTimeout(() => {
-        if (solve()) {
-            resDiv.innerHTML = `<h3>Матчи (${schedule.length}):</h3>` + 
-                schedule.map((g, i) => `<div class="game"><b>${i+1}.</b> ${g}</div>`).join('');
-        } else {
-            resDiv.innerHTML = "Ошибка: не удалось составить полную сетку без остатков.";
-        }
-    }, 50);
+function displaySchedule() {
+    const resDiv = document.getElementById('result');
+    const sorted = [...globalSchedule].sort((a, b) => a.includes("RND") - b.includes("RND"));
+    
+    resDiv.innerHTML = `<h3 style="font-size:16px;">Матчей: ${sorted.length}</h3>` + 
+        sorted.map((g, i) => `<div class="game"><span><b>${i+1}.</b> ${g}</span></div>`).join('');
+}
+
+function shuffleExisting() {
+    if (globalSchedule.length === 0) return;
+    
+    let normal = globalSchedule.filter(g => !g.includes("RND"));
+    let rnds = globalSchedule.filter(g => g.includes("RND"));
+    
+    normal.sort(() => Math.random() - 0.5);
+    globalSchedule = [...normal, ...rnds];
+    displaySchedule();
 }
 </script>
 </body>

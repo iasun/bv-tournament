@@ -5,123 +5,399 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Волейбол: Генератор матчей</title>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; max-width: 500px; margin: auto; background: #f4f4f9; color: #333; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        input { width: 100%; padding: 12px; margin: 10px 0 20px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-        .btn-group { display: flex; gap: 8px; }
-        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        body { 
+            font-family: -apple-system, sans-serif; 
+            padding: 20px; 
+            max-width: 650px; 
+            margin: auto; 
+            background: #f4f4f9; 
+            color: #333; 
+        }
+        .card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+            overflow-x: auto; 
+        }
+        label { 
+            font-size: 14px; 
+            font-weight: bold; 
+            display: block; 
+            margin-bottom: 5px; 
+        }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 0 0 20px; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            font-size: 16px; 
+        }
+        .btn-group { 
+            display: flex; 
+            gap: 8px; 
+        }
+        button { 
+            flex: 1; 
+            padding: 12px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 14px; 
+            transition: 0.2s; 
+        }
         .btn-main { background: #007bff; color: white; }
         .btn-main:hover { background: #0056b3; }
         .btn-shuffle { background: #28a745; color: white; }
         .btn-shuffle:hover { background: #218838; }
         button:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
-        #result { margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; }
-        .game { padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; font-size: 15px; }
-        .game:last-child { border-bottom: none; }
-        .game b { color: #007bff; margin-right: 8px; }
+        
+        #result, #stats { 
+            margin-top: 20px; 
+            border-top: 1px solid #eee; 
+            padding-top: 10px; 
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 10px; 
+            font-size: 14px;
+        }
+        th, td { 
+            padding: 10px; 
+            text-align: center; 
+            border-bottom: 1px solid #eee; 
+        }
+        th { 
+            color: #007bff; 
+            font-weight: bold;
+        }
+        tr:last-child td { border-bottom: none; }
+        
+        .empty-court { color: #aaa; }
         .rnd { color: #d93025; font-weight: bold; }
+        
+        h3 {
+            font-size: 18px;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .stats-badge {
+            font-size: 14px;
+            background: #eef;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: normal;
+            color: #555;
+        }
+
+        .stats-table th { color: #333; min-width: 25px;}
+        .stats-table td { min-width: 25px; }
+        .stats-table .empty-cell { background-color: #fcfcfc; }
+        
+        .max-val { font-weight: bold; font-size: 1.1em; color: #d93025; }
+        .min-val { font-weight: bold; font-size: 1.1em; color: #007bff; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <h2 style="margin-top:0;">🏐 Сетка игр каждый с каждым</h2>
-    <label for="playerCount">Количество игроков (N):</label>
-    <input type="number" id="playerCount" value="6" min="4">
+    
+    <label for="players">Количество игроков (N):</label>
+    <input type="number" id="players" value="8" min="2">
+    
+    <label for="courts">Количество кортов (M):</label>
+    <input type="number" id="courts" value="2" min="1">
     
     <div class="btn-group">
-        <button class="btn-main" onclick="fullResetAndGenerate()">Рассчитать</button>
-        <button id="shuffleBtn" class="btn-shuffle" onclick="shuffleExisting()" disabled>Перетасовать</button>
+        <button class="btn-main" onclick="calculate()">Рассчитать</button>
+        <button id="shuffleBtn" class="btn-shuffle" onclick="shuffle()" disabled>Перетасовать</button>
     </div>
 
-    <div id="result" style="display:none;"></div>
+    <div id="result"></div>
+    <div id="stats"></div>
 </div>
 
 <script>
-let globalSchedule = [];
+    let globalData = { normalRounds: [], rnd: [] };
+    let currentCourts = 2;
 
-function fullResetAndGenerate() {
-    const n = parseInt(document.getElementById('playerCount').value);
-    if (isNaN(n) || n < 4) { alert("Минимум 4 игрока"); return; }
+    function calculate() {
+        const N = parseInt(document.getElementById('players').value);
+        currentCourts = parseInt(document.getElementById('courts').value);
 
-    const resDiv = document.getElementById('result');
-    resDiv.style.display = "block";
-    resDiv.innerHTML = "<i>Генерация...</i>";
-
-    setTimeout(() => {
-        let result = null;
-        let attempts = 0;
-
-        while (result === null && attempts < 2000) {
-            attempts++;
-            result = tryGenerate(n);
+        if (isNaN(N) || N < 2) {
+            alert("Пожалуйста, введите корректное количество игроков (минимум 2).");
+            return;
+        }
+        if (isNaN(currentCourts) || currentCourts < 1) {
+            alert("Пожалуйста, введите корректное количество кортов (минимум 1).");
+            return;
         }
 
-        if (result) {
-            globalSchedule = result;
-            document.getElementById('shuffleBtn').disabled = false; // Активируем кнопку
-            displaySchedule();
-        } else {
-            resDiv.innerHTML = "Не удалось найти решение. Попробуйте ещё раз.";
-        }
-    }, 50);
-}
-
-function tryGenerate(n) {
-    let allPossiblePairs = [];
-    for (let i = 1; i <= n; i++) {
-        for (let j = i + 1; j <= n; j++) allPossiblePairs.push([i, j]);
-    }
-    allPossiblePairs.sort(() => Math.random() - 0.5);
-
-    let schedule = [];
-
-    function solve(currentPairs) {
-        if (currentPairs.length === 0) return true;
-        if (currentPairs.length === 1) {
-            const p = currentPairs[0];
-            schedule.push(`${p[0]}-${p[1]} vs <span class="rnd">RND</span>`);
-            return true;
-        }
-
-        const p1 = currentPairs[0];
-        const others = currentPairs.slice(1);
-        let candidates = others.filter(p2 => 
-            p2[0] !== p1[0] && p2[0] !== p1[1] && p2[1] !== p1[0] && p2[1] !== p1[1]
-        );
-
-        candidates.sort(() => Math.random() - 0.5);
-
-        for (let op of candidates) {
-            schedule.push(`${p1[0]}-${p1[1]} vs ${op[0]}-${op[1]}`);
-            const nextPairs = others.filter(p => p !== op);
-            if (solve(nextPairs)) return true;
-            schedule.pop();
-        }
-        return false;
+        generateSchedule(N);
+        renderSchedule();
+        renderStats(N);
+        
+        document.getElementById('shuffleBtn').disabled = false;
     }
 
-    return solve(allPossiblePairs) ? schedule : null;
-}
+    function shuffle() {
+        if (globalData.normalRounds.length > 0) {
+            globalData.normalRounds.sort(() => Math.random() - 0.5);
+            for (let r of globalData.normalRounds) {
+                r.sort(() => Math.random() - 0.5);
+            }
+            renderSchedule();
+        }
+    }
 
-function displaySchedule() {
-    const resDiv = document.getElementById('result');
-    const sorted = [...globalSchedule].sort((a, b) => a.includes("RND") - b.includes("RND"));
-    
-    resDiv.innerHTML = `<h3 style="font-size:16px;">Матчей: ${sorted.length}</h3>` + 
-        sorted.map((g, i) => `<div class="game"><span><b>${i+1}.</b> ${g}</span></div>`).join('');
-}
+    function generateSchedule(N) {
+        let bestScore = Infinity;
+        let bestRounds = [];
+        let bestRnd = [];
 
-function shuffleExisting() {
-    if (globalSchedule.length === 0) return;
-    
-    let normal = globalSchedule.filter(g => !g.includes("RND"));
-    let rnds = globalSchedule.filter(g => g.includes("RND"));
-    
-    normal.sort(() => Math.random() - 0.5);
-    globalSchedule = [...normal, ...rnds];
-    displaySchedule();
-}
+        for (let iter = 0; iter < 500; iter++) {
+            let pairs = [];
+            for (let i = 1; i <= N; i++) {
+                for (let j = i + 1; j <= N; j++) {
+                    pairs.push([i, j]);
+                }
+            }
+            pairs.sort(() => Math.random() - 0.5);
+
+            let oppCount = Array.from({length: N + 1}, () => new Array(N + 1).fill(0));
+            let rounds = [];
+
+            while (pairs.length > 0) {
+                let currentRound = [];
+                let availablePlayers = new Set();
+                for(let i = 1; i <= N; i++) availablePlayers.add(i);
+
+                let courtsFilled = 0;
+
+                while (courtsFilled < currentCourts && pairs.length > 1) {
+                    let bestMatchIdxs = null;
+                    let bestMatchScore = Infinity;
+
+                    for (let i = 0; i < pairs.length; i++) {
+                        let p1 = pairs[i];
+                        if (!availablePlayers.has(p1[0]) || !availablePlayers.has(p1[1])) continue;
+
+                        for (let j = i + 1; j < pairs.length; j++) {
+                            let p2 = pairs[j];
+                            if (!availablePlayers.has(p2[0]) || !availablePlayers.has(p2[1])) continue;
+
+                            // ИСПРАВЛЕНИЕ: Игрок не может играть сам против себя
+                            if (p1[0] === p2[0] || p1[0] === p2[1] || p1[1] === p2[0] || p1[1] === p2[1]) {
+                                continue;
+                            }
+
+                            let maxOpp = Math.max(
+                                oppCount[p1[0]][p2[0]], oppCount[p1[0]][p2[1]],
+                                oppCount[p1[1]][p2[0]], oppCount[p1[1]][p2[1]]
+                            );
+
+                            let score = maxOpp + (Math.random() * 0.2); 
+
+                            if (score < bestMatchScore) {
+                                bestMatchScore = score;
+                                bestMatchIdxs = [i, j];
+                            }
+                        }
+                    }
+
+                    if (bestMatchIdxs) {
+                        let [i, j] = bestMatchIdxs;
+                        let p1 = pairs[i];
+                        let p2 = pairs[j];
+                        
+                        currentRound.push({ p1: p1, p2: p2 });
+                        
+                        availablePlayers.delete(p1[0]); availablePlayers.delete(p1[1]);
+                        availablePlayers.delete(p2[0]); availablePlayers.delete(p2[1]);
+                        
+                        oppCount[p1[0]][p2[0]]++; oppCount[p1[0]][p2[1]]++;
+                        oppCount[p1[1]][p2[0]]++; oppCount[p1[1]][p2[1]]++;
+                        oppCount[p2[0]][p1[0]]++; oppCount[p2[1]][p1[0]]++;
+                        oppCount[p2[0]][p1[1]]++; oppCount[p2[1]][p1[1]]++;
+
+                        pairs.splice(Math.max(i, j), 1);
+                        pairs.splice(Math.min(i, j), 1);
+
+                        courtsFilled++;
+                    } else {
+                        break; 
+                    }
+                }
+
+                if (currentRound.length > 0) {
+                    rounds.push(currentRound);
+                } else {
+                    break;
+                }
+            }
+            
+            let leftOverRnd = [];
+            for (let p of pairs) {
+                leftOverRnd.push({ p1: p });
+            }
+
+            let maxOverallOpp = 0;
+            let minOverallOpp = Infinity;
+            
+            for (let i = 1; i <= N; i++) {
+                for (let j = i + 1; j <= N; j++) {
+                    let val = oppCount[i][j];
+                    if (val > maxOverallOpp) maxOverallOpp = val;
+                    if (val < minOverallOpp) minOverallOpp = val;
+                }
+            }
+            
+            if (minOverallOpp === Infinity) minOverallOpp = 0;
+
+            let diff = maxOverallOpp - minOverallOpp;
+            let score = (leftOverRnd.length * 100000) + (rounds.length * 1000) + (diff * 10) + maxOverallOpp;
+
+            if (score < bestScore) {
+                bestScore = score;
+                bestRounds = rounds;
+                bestRnd = leftOverRnd;
+            }
+        }
+
+        globalData.normalRounds = bestRounds;
+        globalData.rnd = bestRnd;
+    }
+
+    function renderSchedule() {
+        let rounds = [];
+        for (let r of globalData.normalRounds) rounds.push([...r]);
+
+        let rndMatches = [...globalData.rnd];
+        let rndRounds = [];
+        
+        while(rndMatches.length > 0) {
+            let r = [];
+            let playersInRndRound = new Set();
+            let i = 0;
+            
+            while(i < rndMatches.length && r.length < currentCourts) {
+                let m = rndMatches[i];
+                if(!playersInRndRound.has(m.p1[0]) && !playersInRndRound.has(m.p1[1])) {
+                    r.push(m);
+                    playersInRndRound.add(m.p1[0]); 
+                    playersInRndRound.add(m.p1[1]);
+                    rndMatches.splice(i, 1);
+                } else {
+                    i++;
+                }
+            }
+            rndRounds.push(r);
+        }
+
+        rounds = rounds.concat(rndRounds);
+
+        let html = '<h3>Расписание игр</h3><table><thead><tr><th>Раунд</th>';
+        for (let c = 1; c <= currentCourts; c++) {
+            html += `<th>Корт ${c}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+
+        if (rounds.length === 0) {
+            html += `<tr><td colspan="${currentCourts + 1}">Матчи не найдены</td></tr>`;
+        }
+
+        for (let r = 0; r < rounds.length; r++) {
+            html += `<tr><td><strong>${r + 1}</strong></td>`;
+            for (let c = 0; c < currentCourts; c++) {
+                let match = rounds[r][c];
+                if (match) {
+                    if (match.p2) {
+                        html += `<td>${match.p1[0]}-${match.p1[1]} vs ${match.p2[0]}-${match.p2[1]}</td>`;
+                    } else {
+                        html += `<td><span class="rnd">${match.p1[0]}-${match.p1[1]} vs RND</span></td>`;
+                    }
+                } else {
+                    html += `<td class="empty-court">-</td>`;
+                }
+            }
+            html += '</tr>';
+        }
+        
+        html += '</tbody></table>';
+        document.getElementById('result').innerHTML = html;
+    }
+
+    function renderStats(N) {
+        let stats = Array.from({length: N + 1}, () => new Array(N + 1).fill(0));
+
+        for (let round of globalData.normalRounds) {
+            for (let match of round) {
+                if (match.p2) { 
+                    let [a, b] = match.p1;
+                    let [c, d] = match.p2;
+                    let matchups = [[a, c], [a, d], [b, c], [b, d]];
+                    
+                    for (let [x, y] of matchups) {
+                        let min = Math.min(x, y);
+                        let max = Math.max(x, y);
+                        stats[min][max]++;
+                    }
+                }
+            }
+        }
+
+        let maxVal = -Infinity;
+        let minVal = Infinity;
+        for (let i = 1; i <= N; i++) {
+            for (let j = i + 1; j <= N; j++) {
+                if (stats[i][j] > maxVal) maxVal = stats[i][j];
+                if (stats[i][j] < minVal) minVal = stats[i][j];
+            }
+        }
+
+        let diff = maxVal - minVal;
+
+        let html = `<h3>Матрица встреч <span class="stats-badge">Разница (Max-Min): <b>${diff}</b></span></h3>`;
+        html += '<table class="stats-table"><thead><tr><th></th>';
+        for (let i = 1; i <= N; i++) {
+            html += `<th>${i}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+
+        for (let i = 1; i <= N; i++) {
+            html += `<tr><th>${i}</th>`;
+            for (let j = 1; j <= N; j++) {
+                if (j > i) {
+                    let val = stats[i][j];
+                    if (val === maxVal) {
+                        html += `<td class="max-val">${val}</td>`;
+                    } else if (val === minVal) {
+                        html += `<td class="min-val">${val}</td>`;
+                    } else {
+                        html += `<td>${val}</td>`;
+                    }
+                } else {
+                    html += `<td class="empty-cell"></td>`; 
+                }
+            }
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+        
+        document.getElementById('stats').innerHTML = html;
+    }
 </script>
+
 </body>
 </html>

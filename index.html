@@ -99,12 +99,29 @@
             color: #555;
         }
 
-        .stats-table th { color: #333; min-width: 25px;}
-        .stats-table td { min-width: 25px; }
+        .stats-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        .stats-table th, .stats-table td {
+            padding: 6px 1px; 
+            font-size: 13px;
+            overflow: hidden;
+            text-overflow: clip; 
+        }
+        .stats-table th { color: #333; }
         .stats-table .empty-cell { background-color: #fcfcfc; }
         
         .max-val { font-weight: bold; font-size: 1.1em; color: #d93025; }
         .min-val { font-weight: bold; font-size: 1.1em; color: #007bff; }
+
+        @media (max-width: 480px) {
+            .stats-table th, .stats-table td { 
+                font-size: 10px; 
+                padding: 4px 0;
+            }
+            .max-val, .min-val { font-size: 1em; } 
+        }
     </style>
 </head>
 <body>
@@ -197,7 +214,6 @@
                             let p2 = pairs[j];
                             if (!availablePlayers.has(p2[0]) || !availablePlayers.has(p2[1])) continue;
 
-                            // ИСПРАВЛЕНИЕ: Игрок не может играть сам против себя
                             if (p1[0] === p2[0] || p1[0] === p2[1] || p1[1] === p2[0] || p1[1] === p2[1]) {
                                 continue;
                             }
@@ -370,14 +386,19 @@
 
         let html = `<h3>Матрица встреч <span class="stats-badge">Разница (Max-Min): <b>${diff}</b></span></h3>`;
         html += '<table class="stats-table"><thead><tr><th></th>';
-        for (let i = 1; i <= N; i++) {
+        
+        // Удаляем первый пустой столбец, начиная вывод заголовков с двойки
+        for (let i = 2; i <= N; i++) {
             html += `<th>${i}</th>`;
         }
         html += '</tr></thead><tbody>';
 
-        for (let i = 1; i <= N; i++) {
+        // Удаляем последнюю пустую строку, заканчивая цикл на N-1
+        for (let i = 1; i < N; i++) {
             html += `<tr><th>${i}</th>`;
-            for (let j = 1; j <= N; j++) {
+            
+            // Заполнение ячеек также начинаем со второго столбца
+            for (let j = 2; j <= N; j++) {
                 if (j > i) {
                     let val = stats[i][j];
                     if (val === maxVal) {

@@ -110,7 +110,9 @@
             text-overflow: clip; 
         }
         .stats-table th { color: #333; }
-        .stats-table .empty-cell { background-color: #fcfcfc; }
+        
+        /* Класс для диагонали (игрок сам с собой) */
+        .stats-table .diagonal-cell { background-color: #e0e0e0; } 
         
         .max-val { font-weight: bold; font-size: 1.1em; color: #d93025; }
         .min-val { font-weight: bold; font-size: 1.1em; color: #007bff; }
@@ -387,20 +389,27 @@
         let html = `<h3>Матрица встреч <span class="stats-badge">Разница (Max-Min): <b>${diff}</b></span></h3>`;
         html += '<table class="stats-table"><thead><tr><th></th>';
         
-        // Удаляем первый пустой столбец, начиная вывод заголовков с двойки
-        for (let i = 2; i <= N; i++) {
+        // Возвращаем все столбцы
+        for (let i = 1; i <= N; i++) {
             html += `<th>${i}</th>`;
         }
         html += '</tr></thead><tbody>';
 
-        // Удаляем последнюю пустую строку, заканчивая цикл на N-1
-        for (let i = 1; i < N; i++) {
+        // Возвращаем все строки
+        for (let i = 1; i <= N; i++) {
             html += `<tr><th>${i}</th>`;
             
-            // Заполнение ячеек также начинаем со второго столбца
-            for (let j = 2; j <= N; j++) {
-                if (j > i) {
-                    let val = stats[i][j];
+            // Выводим все ячейки
+            for (let j = 1; j <= N; j++) {
+                if (i === j) {
+                    // Игрок сам с собой (диагональ)
+                    html += `<td class="diagonal-cell"></td>`;
+                } else {
+                    // Берем значение из верхней половины матрицы для обеих симметричных ячеек
+                    let r = Math.min(i, j);
+                    let c = Math.max(i, j);
+                    let val = stats[r][c];
+                    
                     if (val === maxVal) {
                         html += `<td class="max-val">${val}</td>`;
                     } else if (val === minVal) {
@@ -408,8 +417,6 @@
                     } else {
                         html += `<td>${val}</td>`;
                     }
-                } else {
-                    html += `<td class="empty-cell"></td>`; 
                 }
             }
             html += '</tr>';

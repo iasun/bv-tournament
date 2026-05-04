@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Волейбол: Генератор матчей</title>
+    
+    <!-- Подключаем библиотеку для экспорта в PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
     <style>
         body { 
             font-family: -apple-system, sans-serif; 
@@ -38,9 +42,11 @@
         .btn-group { 
             display: flex; 
             gap: 8px; 
+            flex-wrap: wrap;
         }
         button { 
             flex: 1; 
+            min-width: 120px;
             padding: 12px; 
             border: none; 
             border-radius: 8px; 
@@ -53,6 +59,8 @@
         .btn-main:hover { background: #0056b3; }
         .btn-shuffle { background: #28a745; color: white; }
         .btn-shuffle:hover { background: #218838; }
+        .btn-pdf { background: #6f42c1; color: white; }
+        .btn-pdf:hover { background: #5a32a3; }
         button:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
         
         #result, #stats { 
@@ -110,8 +118,6 @@
             text-overflow: clip; 
         }
         .stats-table th { color: #333; }
-        
-        /* Класс для диагонали (игрок сам с собой) */
         .stats-table .diagonal-cell { background-color: #e0e0e0; } 
         
         .max-val { font-weight: bold; font-size: 1.1em; color: #d93025; }
@@ -140,6 +146,7 @@
     <div class="btn-group">
         <button class="btn-main" onclick="calculate()">Рассчитать</button>
         <button id="shuffleBtn" class="btn-shuffle" onclick="shuffle()" disabled>Перетасовать</button>
+        <button id="pdfBtn" class="btn-pdf" onclick="exportPDF()" disabled>Скачать PDF</button>
     </div>
 
     <div id="result"></div>
@@ -168,6 +175,7 @@
         renderStats(N);
         
         document.getElementById('shuffleBtn').disabled = false;
+        document.getElementById('pdfBtn').disabled = false;
     }
 
     function shuffle() {
@@ -178,6 +186,48 @@
             }
             renderSchedule();
         }
+    }
+
+    // Функция для генерации и скачивания PDF
+    function exportPDF() {
+        const N = document.getElementById('players').value;
+        const M = document.getElementById('courts').value;
+        
+        // Создаем временный контейнер для сборки PDF-страницы
+        const pdfContainer = document.createElement('div');
+        pdfContainer.style.padding = '20px';
+        pdfContainer.style.fontFamily = '-apple-system, sans-serif';
+        pdfContainer.style.background = 'white';
+
+        // Формируем красивый заголовок
+        pdfContainer.innerHTML = `
+            <h2 style="text-align: center; color: #333; margin-top: 0; margin-bottom: 10px;">
+                Расписание игр каждый с каждым
+            </h2>
+            <div style="text-align: center; color: #555; margin-bottom: 25px; font-size: 16px;">
+                Количество игроков: <b>${N}</b> &nbsp;&nbsp;|&nbsp;&nbsp; Количество кортов: <b>${M}</b>
+            </div>
+            <div id="pdf-table-wrapper"></div>
+        `;
+
+        // Клонируем только таблицу расписания (без заголовка <h3>)
+        const scheduleTable = document.querySelector('#result table');
+        if (!scheduleTable) return;
+        
+        const tableClone = scheduleTable.cloneNode(true);
+        pdfContainer.querySelector('#pdf-table-wrapper').appendChild(tableClone);
+
+        // Настройки для html2pdf
+        const opt = {
+            margin:       10,
+            filename:     `Расписание_волейбол_${N}_игроков.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 }, // Высокое качество (scale: 2 делает текст четким)
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        // Запускаем генерацию
+        html2pdf().set(opt).from(pdfContainer).save();
     }
 
     function generateSchedule(N) {
@@ -386,26 +436,20 @@
 
         let diff = maxVal - minVal;
 
-        let html = `<h3>Кто на кого сколько раз выходит <span class="stats-badge">Разница (Max-Min): <b>${diff}</b></span></h3>`;
+        let html = `<h3>Матрица встреч <span class="stats-badge">Разница (Max-Min): <b>${diff}</b></span></h3>`;
         html += '<table class="stats-table"><thead><tr><th></th>';
         
-        // Возвращаем все столбцы
         for (let i = 1; i <= N; i++) {
             html += `<th>${i}</th>`;
         }
         html += '</tr></thead><tbody>';
 
-        // Возвращаем все строки
         for (let i = 1; i <= N; i++) {
             html += `<tr><th>${i}</th>`;
-            
-            // Выводим все ячейки
             for (let j = 1; j <= N; j++) {
                 if (i === j) {
-                    // Игрок сам с собой (диагональ)
                     html += `<td class="diagonal-cell"></td>`;
                 } else {
-                    // Берем значение из верхней половины матрицы для обеих симметричных ячеек
                     let r = Math.min(i, j);
                     let c = Math.max(i, j);
                     let val = stats[r][c];
